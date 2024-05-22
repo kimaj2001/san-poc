@@ -11,7 +11,8 @@ def hello():
 def count_endpoint():
     global count
     count += 1
-    return f'Count: {count}'
+    return f'<h1 style="font-size: 3em;">Count: {count}</h1>'
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
