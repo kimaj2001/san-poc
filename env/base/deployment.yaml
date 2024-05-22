@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: 'board'
+spec:
+  selector:
+    matchLabels:
+      app: board-application
+  template:
+    metadata:
+      labels:
+        app: board-application
+    spec:
+      containers:
+      - image: image-registry.openshift-image-registry.svc:5000/board/board-app:latest
+        imagePullPolicy: Always
+        name: board-application
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        - containerPort: 8443
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 30m

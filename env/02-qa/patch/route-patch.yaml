@@ -1,0 +1,6 @@
+- op: add
+  path: /spec/to/name
+  value: board-qa
+- op: add
+  path: /spec/host
+  value: board-qa.apps.con1.mtp.local

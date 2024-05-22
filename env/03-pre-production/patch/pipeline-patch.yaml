@@ -1,0 +1,12 @@
+- op: add
+  path: /spec/params/0/default
+  value: board-stg/board-app:init
+- op: add
+  path: /spec/params/2/default
+  value: https://gitlab.cluster-2.poc.cloud/root/board-app.git
+- op: add
+  path: /spec/params/7/default
+  value: sqp_c39dd0005cefcf22ebf484e804d37104a857f578
+- op: add
+  path: /spec/params/8/default
+  value: board-stg

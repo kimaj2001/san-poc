@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+configMapGenerator:
+- name: maven-settings
+  files:
+  - maven-settings/settings.xml
+- name: sonar-settings
+  files:
+  - sonar-settings/settings.xml
+resources:
+- deployment.yaml
+- route.yaml
+- service.yaml
+- gitops-admin-rolebindings.yaml
+- secret/smtp-secret.yaml
+- secret/teams-webhook-secret.yaml
+- secret/gitlab-secret.yaml
+- send-to-microsoft-teams.yaml
+- pipeline.yaml
+- hpa.yaml
+#- pipeline-serviceaccount.yaml
+#- namespace.yaml
+#- source-pvc.yaml
+#- analyzer-pvc.yaml

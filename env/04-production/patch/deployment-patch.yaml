@@ -1,0 +1,6 @@
+- op: add
+  path: /spec/template/spec/containers/0/image
+  value: image-registry.openshift-image-registry.svc:5000/board-prd/board-app:init
+- op: add
+  path: /spec/replicas
+  value: 2
