@@ -1,5 +1,5 @@
 # 베이스 이미지를 지정합니다.
-FROM python:3.9-slim
+FROM image-registry.openshift-image-registry.svc:5000/openshift/python:3.9-ubi8
 
 # 작업 디렉토리를 설정합니다.
 WORKDIR /app
