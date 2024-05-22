@@ -1,0 +1,14 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: job
+  namespace: job
+spec:
+  host: job.apps.poc.amc
+  port:
+    targetPort: 8080
+  to:
+    kind: Service
+    name: job-service
+    weight: 100
+  wildcardPolicy: None
