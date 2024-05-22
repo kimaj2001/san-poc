@@ -14,7 +14,7 @@ def count_endpoint():
     return f'<h1 style="font-size: 3em;">Count: {count}</h1>'
 
 @app.route('/count-view')
-def count_endpoint():
+def count_endpoint_view():
     global count
     return f'<h1 style="font-size: 3em;">Count: {count}</h1>'
 
