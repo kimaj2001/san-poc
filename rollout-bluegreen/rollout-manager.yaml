@@ -1,5 +1,0 @@
-apiVersion: argoproj.io/v1alpha1
-kind: RolloutManager
-metadata:
-  name: bg-rollout-manager
-  namespace: rollout-bg
