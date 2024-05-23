@@ -1,0 +1,29 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: httpd-gitconfig
+spec:
+  failedBuildsHistoryLimit: 5
+  nodeSelector: null
+  output:
+    to:
+      kind: DockerImage
+      name: image-registry.openshift-image-registry.svc:5000/build-test/httpd:v2
+  postCommit: {}
+  resources: {}
+  runPolicy: Serial
+  source:
+    contextDir: /
+    git:
+      uri: https://gitlab.poc.amc:9443/root/buildconfig.git
+    type: Git
+  strategy:
+    sourceStrategy:
+      env:
+      - name: GIT_SSL_NO_VERIFY
+        value: "true"
+      from:
+        kind: DockerImage
+        name: registry.redhat.io/ubi8/httpd-24:latest
+    type: Source
+  successfulBuildsHistoryLimit: 5
