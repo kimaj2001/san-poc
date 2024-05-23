@@ -1,0 +1,14 @@
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: preview
+spec:
+  host: preview-rollout-bg.apps.poc.amc
+  to:
+    kind: Service
+    name: rollout-bluegreen-preview
+    weight: 100
+  port:
+    targetPort: 8080
+  wildcardPolicy: None
+
