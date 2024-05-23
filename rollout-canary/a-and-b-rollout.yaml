@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1     # apps/v1 대신 argoproj.io/v1alpha1을 사용한다
+kind: Rollout  # Deplyment 대신 Rollout을 사용한다
+metadata:
+  name: rollout-a-b
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: rollout-a-b
+  template:
+    metadata:
+      labels:
+        app: rollout-a-b
+    spec:
+      containers:
+      - name: rollouts-demo
+        image: argoproj/rollouts-demo:blue
+        #image: argoproj/rollouts-demo:green
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+  strategy:
+    canary: #Indicates that the rollout should use the Canary strategy
+      maxSurge: "25%"
+      maxUnavailable: 0
+      steps:
+      - setWeight: 10
+      - pause:
+          duration: 1h # 1 hour
+      - setWeight: 20
+      - pause: {} # pause indefinitely
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: rollout-a-b-service
+spec:
+  selector:
+    app: rollout-a-b
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
