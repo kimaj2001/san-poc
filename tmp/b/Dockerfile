@@ -14,4 +14,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Flask 애플리케이션을 실행합니다.
-CMD ["python", "app-b.py"]
+CMD ["python", "app.py"]
