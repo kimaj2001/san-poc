@@ -1,0 +1,31 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: green-config
+  namespace: build-test
+spec:
+  failedBuildsHistoryLimit: 5
+  nodeSelector: null
+  output:
+    to:
+      kind: DockerImage
+      name: image-registry.openshift-image-registry.svc:5000/build-test/green:v2
+  postCommit: {}
+  resources: {}
+  runPolicy: Serial
+  source:
+    contextDir: /green-config
+    git:
+      uri: https://gitlab.poc.amc:9443/root/san-poc.git
+    type: Git
+  strategy:
+    sourceStrategy:
+      env:
+      - name: GIT_SSL_NO_VERIFY
+        value: "true"
+      from:
+        kind: ImageStreamTag
+        name: httpd:2.4-ubi9
+        namespace: openshift
+    type: Source
+  successfulBuildsHistoryLimit: 5

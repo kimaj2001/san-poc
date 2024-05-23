@@ -1,0 +1,18 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: bluegreen
+  namespace: deploy-test
+spec:
+  alternateBackends:
+  - kind: Service
+    name: green
+    weight: 80
+  host: bluegreen.apps.poc.amc
+  port:
+    targetPort: 8080
+  to:
+    kind: Service
+    name: blue
+    weight: 20
+  wildcardPolicy: None

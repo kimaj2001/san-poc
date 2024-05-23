@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"green:v2","namespace":"build-test"},"fieldPath":"spec.template.spec.containers[?(@.name==\"container\")].image","pause":"true"}]'
+  name: green
+  namespace: deploy-test
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 3
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: green
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: green
+    spec:
+      containers:
+      - image: image-registry.openshift-image-registry.svc:5000/build-test/green@sha256:1725f7a54ffe26371a1d78b48f9670064c7e26fbad20a7f12df4e2a8f094ccd8
+        imagePullPolicy: IfNotPresent
+        name: container
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
