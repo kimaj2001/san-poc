@@ -1,0 +1,14 @@
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: active
+spec:
+  host: active-rollout-bg.apps.poc.amc
+  to:
+    kind: Service
+    name: rollout-bluegreen-active
+    weight: 100
+  port:
+    targetPort: 8080
+  wildcardPolicy: None
+
