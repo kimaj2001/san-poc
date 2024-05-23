@@ -1,0 +1,26 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: httpd-buildconfig
+  namespace: build-test
+spec:
+  failedBuildsHistoryLimit: 5
+  nodeSelector: null
+  output:
+    to:
+      kind: DockerImage
+      name: image-registry.openshift-image-registry.svc:5000/build-test/httpd:v1
+  postCommit: {}
+  resources: {}
+  runPolicy: Serial
+  source:
+    dockerfile: "FROM image:test\r\nRUN echo \"Welcome to the world!\" > /var/www/html/index.html"
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: httpd:2.4-ubi9
+        namespace: openshift
+    type: Docker
+  successfulBuildsHistoryLimit: 5
