@@ -3,6 +3,13 @@ kind: Pipeline
 metadata:
   name: build-pipeline
 spec:
+  params:
+    - default: pipeline-test/board-app
+      name: IMAGE_NAME
+      type: string
+    - default: v1
+      name: TAG
+      type: string
   tasks:
     - name: git-clone
       params:
@@ -88,7 +95,7 @@ spec:
     - name: image-build
       params:
         - name: IMAGE
-          value: 'image-registry.openshift-image-registry.svc:5000/pipeline-build-test/board-app:v1'
+          value: 'image-registry.openshift-image-registry.svc:5000/$(params.IMAGE_NAME):$(params.TAG)'
         - name: BUILDER_IMAGE
           value: 'registry.redhat.io/rhel8/buildah@sha256:b48f410efa0ff8ab0db6ead420a5d8d866d64af846fece5efb185230d7ecf591'
         - name: STORAGE_DRIVER
@@ -118,3 +125,4 @@ spec:
   workspaces:
     - name: git-clone-workspace
     - name: maven-settings
+
