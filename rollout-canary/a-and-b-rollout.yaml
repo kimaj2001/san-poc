@@ -22,12 +22,9 @@ spec:
         - containerPort: 8080
   strategy:
     canary: #Indicates that the rollout should use the Canary strategy
-      #maxSurge: "25%"
-      #maxUnavailable: 0
+      maxSurge: "50%"
+      maxUnavailable: 0
       steps:
-      - setCanaryScale: 
-          weight: 20
-          matchTrafficWeight: true
       - setWeight: 90
       - pause: {} # pause indefinitely
 ---
