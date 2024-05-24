@@ -24,10 +24,10 @@ spec:
     canary: #Indicates that the rollout should use the Canary strategy
       #maxSurge: "25%"
       #maxUnavailable: 0
-      trafficRouting:
       steps:
       - setCanaryScale: 
           weight: 20
+          matchTrafficWeight: true
       - setWeight: 90
       - pause: {} # pause indefinitely
 ---
