@@ -1,0 +1,14 @@
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: canary
+spec:
+  host: active-rollout-canary.apps.poc.amc
+  to:
+    kind: Service
+    name: rollout-a-b-service
+    weight: 100
+  port:
+    targetPort: 8080
+  wildcardPolicy: None
+
