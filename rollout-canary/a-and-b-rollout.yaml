@@ -23,7 +23,7 @@ spec:
         resources:
           requests:
             cpu: 100m
-            memory: 250M
+            memory: 25M
   strategy:
     canary: #Indicates that the rollout should use the Canary strategy
       maxSurge: "25%"
