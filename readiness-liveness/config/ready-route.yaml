@@ -1,0 +1,13 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: ready-route
+spec:
+  host: ready.apps.poc.amc
+  port:
+    targetPort: 8080
+  to:
+    kind: Service
+    name: ready-service
+    weight: 100
+  wildcardPolicy: None
