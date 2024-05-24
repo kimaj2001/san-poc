@@ -7,7 +7,7 @@ spec:
     kind: Rollout
     name: rollout-a-b
     apiVersion: argoproj.io/v1alpha1
-  minReplicas: 5
+  minReplicas: 2
   maxReplicas: 10
   metrics:
     - type: Resource
