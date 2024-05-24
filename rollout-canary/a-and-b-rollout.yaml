@@ -22,8 +22,8 @@ spec:
         - containerPort: 8080
         resources:
           requests:
-            cpu: 10m
-            memory: 50M
+            cpu: 100m
+            memory: 250M
   strategy:
     canary: #Indicates that the rollout should use the Canary strategy
       maxSurge: "25%"
