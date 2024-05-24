@@ -28,7 +28,7 @@ spec:
       - setWeight: 10
       - pause:
           duration: 1h # 1 hour
-      - setWeight: 20
+      - setWeight: 90
       - pause: {} # pause indefinitely
 ---
 kind: Service
