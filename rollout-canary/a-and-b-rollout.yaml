@@ -15,14 +15,14 @@ spec:
     spec:
       containers:
       - name: rollouts-demo
-        #image: image-registry.openshift-image-registry.svc:5000/test-job/a:v1
-        image: image-registry.openshift-image-registry.svc:5000/test-job/b:v1
+        image: image-registry.openshift-image-registry.svc:5000/test-job/a:v1
+        #image: image-registry.openshift-image-registry.svc:5000/test-job/b:v1
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
   strategy:
     canary: #Indicates that the rollout should use the Canary strategy
-      maxSurge: "50%"
+      maxSurge: "25%"
       maxUnavailable: 0
       steps:
       - setWeight: 80
