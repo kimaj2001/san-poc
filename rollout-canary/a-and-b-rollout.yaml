@@ -3,7 +3,7 @@ kind: Rollout  # Deplyment 대신 Rollout을 사용한다
 metadata:
   name: rollout-a-b
 spec:
-  replicas: 2
+  replicas: 10
   revisionHistoryLimit: 2
   selector:
     matchLabels:
@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
       - name: rollouts-demo
-        #image: image-registry.openshift-image-registry.svc:5000/test-job/a:v1
-        image: image-registry.openshift-image-registry.svc:5000/test-job/b:v1
+        image: image-registry.openshift-image-registry.svc:5000/test-job/a:v1
+        #image: image-registry.openshift-image-registry.svc:5000/test-job/b:v1
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
