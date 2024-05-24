@@ -9,10 +9,5 @@ spec:
     apiVersion: argoproj.io/v1alpha1
     kind: Rollout
     name: rollout-a-b
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 80
+    targetCPUUtilizationPercentage: 80
+    targetMEMORYUtilizationPercentage: 80
