@@ -10,3 +10,4 @@ spec:
     kind: Rollout
     name: rollout-a-b
   targetCPUUtilizationPercentage: 80
+  targetMEMORYUtilizationPercentage: 80
