@@ -2,4 +2,11 @@ apiVersion: autoscaling.openshift.io/v1
 kind: ClusterAutoscaler
 metadata:
   name: default
-spec: {}
+spec:
+  scaleDown:
+    enabled: true
+    delayAfterAdd: 5m
+    delayAfterDelete: 1m
+    delayAfterFailure: 30s
+    unneededTime: 5m
+    utilizationThreshold: "0.95"
