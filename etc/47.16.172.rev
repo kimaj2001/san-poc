@@ -1,0 +1,29 @@
+$TTL    604800
+@       IN      SOA     dns.poc.amc. admin.poc.amc. (
+                        2024051401      ; Serial
+                        604800          ; Refresh
+                        86400           ; Retry
+                        2419200         ; Expire
+                        604800 )        ; Negative Cache TTL
+;
+@       IN      NS      dns.poc.amc.
+
+; DNS 서버
+101     IN      PTR     dns.poc.amc.
+
+; 노드들
+100     IN      PTR     api.poc.amc.
+100     IN      PTR     api-int.poc.amc.
+100     IN      PTR     haproxy.poc.amc.
+102     IN      PTR     bastion.poc.amc.
+103     IN      PTR     nfs.poc.amc.
+104     IN      PTR     master01.poc.amc.
+105     IN      PTR     master02.poc.amc.
+106     IN      PTR     master03.poc.amc.
+107     IN      PTR     infra01.poc.amc.
+108     IN      PTR     infra02.poc.amc.
+109     IN      PTR     router01.poc.amc.
+110     IN      PTR     router02.poc.amc.
+111     IN      PTR     app01.poc.amc.
+112     IN      PTR     app02.poc.amc.
+113     IN      PTR     bootstrap.poc.amc.

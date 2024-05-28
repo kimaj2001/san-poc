@@ -1,0 +1,32 @@
+$TTL    604800
+@       IN      SOA     dns.poc.amc. admin.poc.amc. (
+                        2024051401      ; Serial
+                        604800          ; Refresh
+                        86400           ; Retry
+                        2419200         ; Expire
+                        604800 )        ; Negative Cache TTL
+;
+@       IN      NS      dns.poc.amc.
+
+; DNS 서버
+dns     IN      A       172.16.47.101
+
+; node list
+haproxy         IN      A       172.16.47.100
+bastion         IN      A       172.16.47.102
+nfs             IN      A       172.16.47.103
+api             IN      A       172.16.47.100
+api-int         IN      A       172.16.47.100
+*.apps          IN      A       172.16.47.100
+master01        IN      A       172.16.47.104
+master02        IN      A       172.16.47.105
+master03        IN      A       172.16.47.106
+infra01         IN      A       172.16.47.107
+infra02         IN      A       172.16.47.108
+router01        IN      A       172.16.47.109
+router02        IN      A       172.16.47.110
+app01           IN      A       172.16.47.111
+app02           IN      A       172.16.47.112
+bootstrap       IN      A       172.16.47.113
+
+gitlab		IN	A	172.16.47.102
