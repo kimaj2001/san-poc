@@ -1,0 +1,136 @@
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: ClusterTriggerBinding
+metadata:
+  name: gitlab-push
+  ownerReferences:
+    - apiVersion: operator.tekton.dev/v1alpha1
+      blockOwnerDeletion: true
+      controller: true
+      kind: TektonInstallerSet
+      name: addon-triggers-8vxd8
+  labels:
+    operator.tekton.dev/operand-name: openshift-pipelines-addons
+spec:
+  params:                               // 전달 받을 파라미터 ///
+    - name: git-revision
+      value: $(body.checkout_sha)
+    - name: git-commit-message
+      value: '$(body.commits[0].message)'
+    - name: git-repo-url
+      value: $(body.repository.git_http_url)
+    - name: git-repo-name
+      value: $(body.repository.name)
+    - name: pusher-name
+      value: $(body.user_name)
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: trigger-template-java-app-32yfof
+  namespace: pipeline-maven
+spec:
+
+// ClusterTriggerTemplate 에 전달될 파라미터 정의
+  params:
+    - name: git-revision
+    - name: git-commit-message
+    - name: git-repo-url
+    - name: git-repo-name
+    - name: pusher-name
+
+// 새로 생성될 pipelineRun
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        annotations:
+          pipeline.openshift.io/started-by: ocpadmin
+        generateName: board-app-
+        labels:
+          app.kubernetes.io/instance: java-app
+          app.kubernetes.io/name: java-app
+          pipeline.openshift.io/runtime: java
+          pipeline.openshift.io/runtime-version: openjdk-17-ubi8
+          pipeline.openshift.io/type: openshift
+          tekton.dev/pipeline: java-app
+        namespace: pipeline-board-maven
+      spec:
+        params:
+          - name: IMAGE_NAME
+            value: >-
+              image-registry.openshift-image-registry.svc:5000/pipeline-board-maven/java-app
+          - name: APP_PROFILE
+            value: springboot
+          - name: APP_NAME
+            value: board-app
+          - name: GITHUB_REPO_URL
+            value: 'https://gitlab.cluster-2.poc.cloud/root/board-maven.git'
+          - name: GITHUB_REPO_REVISION
+            value: main
+          - name: GITHUB_REPO_SUBDIRECTORY
+            value: hellospringboot
+
+// 기 생성된 pipeline 정의
+        pipelineRef:
+          name: board-app
+        resources: []
+        status: null
+
+// workspace 정의
+        workspaces:
+          - name: source
+            persistentVolumeClaim:
+              claimName: source-pvc
+          - configMap:
+              name: maven-settings
+            name: maven-settings
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: Trigger
+metadata:
+  name: java-app-gitlab-trigger
+spec:
+  serviceAccountName: pipeline
+
+// clusterinterceptor 정의
+  interceptors:
+    - ref:
+        name: "gitlab"
+
+// 시크릿 명 정의 및 페이로드 정의
+      params:
+        - name: "secretRef"
+          value:
+            secretName: github-secret
+            secretKey: secretToken
+        - name: "eventTypes"
+          value: ["Push Hook"]
+
+// ClusterTriggerBinding 명 정의
+  bindings:
+    - kind: ClusterTriggerBinding
+      ref: gitlab-push
+
+// TriggerTemplate 명 정의
+  template:
+     ref: trigger-template-java-app-32yfof
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: EventListener
+metadata:
+  name: event-listener-elra71
+  namespace: pipeline-board-maven
+spec:
+  serviceAccountName: pipeline
+  triggers:
+    - triggerRef: java-app-gitlab-trigger
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: github-secret
+type: Opaque
+stringData:
+  secretToken: "hwcho"
+---

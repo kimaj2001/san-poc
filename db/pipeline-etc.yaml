@@ -1,0 +1,606 @@
+# CI(pipeline) 구성
+
+# Tasks 생성(custom)
+
+## generate-tag Task
+
+```yaml
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  annotations:
+    description: |
+      Generate a new unique image tag based on format YYYY-MM-YY-HH-MM-SS.
+  name: generate-tag
+  namespace: tst1-pipeline
+spec:
+  results:
+    - description: The current date in human readable format
+      name: image-tag
+      type: string
+  steps:
+    - image: >-
+        hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-ubi8:latest
+      name: generate-image-tag
+      resources: {}
+      script: |
+        #!/usr/bin/env bash
+        echo -n "Generate Tag Name : "
+        
+        GENERATE_TAG_NAME=$(date -u --date="9 hour" +%Y-%m-%d-%H-%M-%S)
+        echo -n $GENERATE_TAG_NAME
+        echo -n $GENERATE_TAG_NAME > $(results.image-tag.path)
+```
+
+## update-manifests Task
+
+```yaml
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: update-manifests
+  namespace: tst1-pipeline
+spec:
+  params:
+    - description: Location of image to be patch with
+      name: IMAGESTREAM
+      type: string
+    - default: .
+      description: The directory in source that contains yaml manifests
+      name: manifest_dir
+      type: string
+  steps:
+    - image: >-
+        hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-ubi8:latest
+      name: update-deploy-yaml
+      resources: {}
+      script: >
+        #!/usr/bin/env bash
+
+        ASIS_IMG=`cat $(inputs.params.manifest_dir)/deployment.yaml | grep
+        hub1-quay-registry.apps.hub1.local | awk '{print $1}'`
+
+        echo "ASIS_IMG: $ASIS_IMG"
+
+        TOBE_IMG=$(inputs.params.IMAGESTREAM)
+
+        echo "TOBE_IMG : $TOBE_IMG"
+
+        sed -i "s|$ASIS_IMG|$TOBE_IMG|"
+        $(inputs.params.manifest_dir)/deployment.yaml
+      workingDir: /workspace/tst1-cfg
+  workspaces:
+    - name: tst1-cfg
+```
+
+## update-repository Task
+
+```yaml
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  annotations:
+    tekton.dev/categories: Git
+    tekton.dev/displayName: git cli
+    tekton.dev/pipelines.minVersion: 0.21.0
+    tekton.dev/platforms: 'linux/amd64,linux/s390x,linux/ppc64le'
+    tekton.dev/tags: git
+  name: update-repository
+  namespace: tst1-pipeline
+  labels:
+    app.kubernetes.io/version: '0.4'
+spec:
+  description: >-
+    This task can be used to perform git operations.
+    
+    Git command that needs to be run can be passwd as a script to be task. This
+    task needs authentication to git in order to push after the git operation.
+  params:
+    - default: 'hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-git:latest'
+      description: |
+        The base image for the task
+      name: BASE_IMAGE
+      type: string
+    - default: ''
+      description: |
+        Git user name for performing git operation.
+      name: GIT_USER_NAME
+      type: string
+    - default: ''
+      description: |
+        Git user email for performing git operation.
+      name: GIT_USER_EMAIL
+      type: string
+    - default: |
+        git help
+      description: The git script to run
+      name: GIT_SCRIPT
+      type: string
+    - default: /tekton/home
+      description: >
+        Absolute path to the user's home directory. Set this explicitly if you
+        are running the image as a non-root user or have overridden
+        
+        the gitInitImage param with an image containing custom user
+        configuratin.
+      name: USER_HOME
+      type: string
+    - default: 'true'
+      description: Log the commands that are executed during `git-clone`'s oepration.
+      name: VERBOSE
+      type: string
+  results:
+    - description: The precise commit SHA after the git operation.
+      name: commit
+      type: string
+  steps:
+    - env:
+        - name: HOME
+          value: $(params.USER_HOME)
+        - name: PARAM_VERBOSE
+          value: $(params.VERBOSE)
+        - name: PARAM_USER_HOME
+          value: $(params.USER_HOME)
+        - name: WORKSPACE_OUTPUT_PATH
+          value: $(workspaces.gitops-output.path)
+        - name: WORKSPACE_SSH_DIRECTORY_BOUND
+          value: $(workspaces.ssh-directory.bound)
+        - name: WORKSPACE_SSH_DIRECTORY_PATH
+          value: $(workspaces.ssh-directory.path)
+        - name: WORKSPACE_BASIC_AUTH_DIRECTORY_BOUND
+          value: $(workspaces.basic-auth.bound)
+        - name: WORKSPACE_BASIC_AUTH_DIRECTORY_PATH
+          value: $(workspaces.basic-auth.path)
+      image: $(params.BASE_IMAGE)
+      name: git
+      resources: {}
+      script: >
+        #!/usr/bin/env sh
+        
+        set -eu
+        
+        if [ "${PARAM_VERBOSE}" = "true" ] ; then
+          set -x
+        fi
+        
+        if [ "${WORKSPACE_BASIC_AUTH_DIRECTORY_BOUND}" = "true" ] ; then
+          cp "${WORKSPACE_BASIC_AUTH_DIRECTORY_PATH}/.git-credentials" "${PARAM_USER_HOME}/.git-credentials"
+          cp "${WORKSPACE_BASIC_AUTH_DIRECTORY_PATH}/.gitconfig" "${PARAM_USER_HOME}/.gitconfig"
+          chmod 400 "${PARAM_USER_HOME}/.git-credentials"
+          chmod 400 "${PARAM_USER_HOME}/.gitconifg"
+        fi
+        
+        if [ "${WORKSPACE_SSH_DIRECTORY_BOUND}" = "true" ] ; then
+          cp -R "${WORKSPACE_SSH_DIRECTORY_BOUND}" "${PARAM_USER_HOME}"/.ssh
+          chmod 700 "${PARAM_USER_HOME}"/.ssh
+          chmod -R 400 "${PARAM_USER_HOME}"/.ssh/*
+        fi
+        
+        # Setting up the config for the git.
+        
+        git config --global user.email "$(params.GIT_USER_EMAIL)"
+        
+        git config --global user.name "$(params.GIT_USER_NAME)"
+        
+        git config --global --add safe.directory
+        "$(workspaces.gitops-output.path)"
+        
+        eval '$(params.GIT_SCRIPT)'
+        
+        RESULT_SHA="$(git rev-parse HEAD | tr -d '\n')"
+        
+        EXIT_CODE="$?"
+        
+        if [ "$EXIT_CODE" != 0 ]
+        
+        then
+          exit $EXIT_CODE
+        fi
+        
+        # Make sure we don't add a trailing newline to the result!
+        
+        printf "%s" "$RESULT_SHA" > "$(results.commit.path)"
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+      workingDir: $(workspaces.gitops-output.path)
+  workspaces:
+    - description: A workspace that contains the fetched git repository.
+      name: gitops-output
+    - description: >
+        An optional workspace that contains the files that need to be added to
+        git. You can
+        
+        access the workspace from your script using `$(workspaces.input.path)`,
+        for instance:
+        
+          cp $(workspaces.input.path)/file_that_i_want .
+          git add file_that_i_want
+          # etc
+      name: input
+      optional: true
+    - description: |
+        A .ssh directory with private key, known_hosts, config, etc. Copied to
+        the user's home before git commands are executed. Used to authenticate
+        with the git remtoe when performing the clone. Binding a Secret to this
+        Workspace is strongly recommended over other volume types.
+      name: ssh-directory
+      optional: true
+    - description: |
+        A workspace containing a .gitconfig add .git-credentials file. These
+        will be copied to the user's home before any git commands are run. Any
+        other files in this Workspace are ignored. It is strongly recommended
+        to user ssh-directory over basic-auth whenever possible and to bind a
+        Secret to this Workspace over other volume types.
+      name: basic-auth
+      optional: true
+```
+
+(스터디 후 적용)
+
+```yaml
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  annotations:
+    tekton.dev/categories: Git
+    tekton.dev/displayName: git cli
+    tekton.dev/pipelines.minVersion: 0.21.0
+    tekton.dev/platforms: 'linux/amd64,linux/s390x,linux/ppc64le'
+    tekton.dev/tags: git
+  name: update-repository
+  namespace: tst1-pipeline
+  labels:
+    app.kubernetes.io/version: '0.4'
+spec:
+  description: >-
+    This task can be used to perform git operations.
+    
+    Git command that needs to be run can be passwd as a script to be task. This
+    task needs authentication to git in order to push after the git operation.
+  params:
+    - default: 'hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-git:latest'
+      description: |
+        The base image for the task
+      name: BASE_IMAGE
+      type: string
+    - default: ''
+      description: |
+        Git user name for performing git operation.
+      name: GIT_USER_NAME
+      type: string
+    - default: ''
+      description: |
+        Git user email for performing git operation.
+      name: GIT_USER_EMAIL
+      type: string
+    - default: |
+        git pull origin main
+
+        git add . -A
+
+        git commit -m "feat(image) \n
+        $(tasks.generate-tag.results.image-tag)"
+
+        git checkout -b main
+
+        git push origin main
+      description: The git script to run
+      name: GIT_SCRIPT
+      type: string
+    - default: /tekton/home
+      description: >
+        Absolute path to the user's home directory. Set this explicitly if you
+        are running the image as a non-root user or have overridden
+        
+        the gitInitImage param with an image containing custom user
+        configuratin.
+      name: USER_HOME
+      type: string
+    - default: 'true'
+      description: Log the commands that are executed during `git-clone`'s oepration.
+      name: VERBOSE
+      type: string
+  results:
+    - description: The precise commit SHA after the git operation.
+      name: commit
+      type: string
+  steps:
+    - env:
+        - name: HOME
+          value: $(params.USER_HOME)
+        - name: PARAM_VERBOSE
+          value: $(params.VERBOSE)
+        - name: PARAM_USER_HOME
+          value: $(params.USER_HOME)
+        - name: WORKSPACE_OUTPUT_PATH
+          value: $(workspaces.gitops-output.path)
+        - name: WORKSPACE_SSH_DIRECTORY_BOUND
+          value: $(workspaces.ssh-directory.bound)
+        - name: WORKSPACE_SSH_DIRECTORY_PATH
+          value: $(workspaces.ssh-directory.path)
+        - name: WORKSPACE_BASIC_AUTH_DIRECTORY_BOUND
+          value: $(workspaces.basic-auth.bound)
+        - name: WORKSPACE_BASIC_AUTH_DIRECTORY_PATH
+          value: $(workspaces.basic-auth.path)
+      image: $(params.BASE_IMAGE)
+      name: git
+      resources: {}
+      script: >
+        #!/usr/bin/env sh
+        
+        set -eu
+        
+        if [ "${PARAM_VERBOSE}" = "true" ] ; then
+          set -x
+        fi
+        
+        if [ "${WORKSPACE_BASIC_AUTH_DIRECTORY_BOUND}" = "true" ] ; then
+          cp "${WORKSPACE_BASIC_AUTH_DIRECTORY_PATH}/.git-credentials" "${PARAM_USER_HOME}/.git-credentials"
+          cp "${WORKSPACE_BASIC_AUTH_DIRECTORY_PATH}/.gitconfig" "${PARAM_USER_HOME}/.gitconfig"
+          chmod 400 "${PARAM_USER_HOME}/.git-credentials"
+          chmod 400 "${PARAM_USER_HOME}/.gitconifg"
+        fi
+        
+        if [ "${WORKSPACE_SSH_DIRECTORY_BOUND}" = "true" ] ; then
+          cp -R "${WORKSPACE_SSH_DIRECTORY_BOUND}" "${PARAM_USER_HOME}"/.ssh
+          chmod 700 "${PARAM_USER_HOME}"/.ssh
+          chmod -R 400 "${PARAM_USER_HOME}"/.ssh/*
+        fi
+        
+        # Setting up the config for the git.
+        
+        git config --global user.email "$(params.GIT_USER_EMAIL)"
+        
+        git config --global user.name "$(params.GIT_USER_NAME)"
+        
+        git config --global --add safe.directory
+        "$(workspaces.gitops-output.path)"
+        
+        eval '$(params.GIT_SCRIPT)'
+        
+        RESULT_SHA="$(git rev-parse HEAD | tr -d '\n')"
+        
+        EXIT_CODE="$?"
+        
+        if [ "$EXIT_CODE" != 0 ]
+        
+        then
+          exit $EXIT_CODE
+        fi
+        
+        # Make sure we don't add a trailing newline to the result!
+        
+        printf "%s" "$RESULT_SHA" > "$(results.commit.path)"
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+      workingDir: $(workspaces.gitops-output.path)
+  workspaces:
+    - description: A workspace that contains the fetched git repository.
+      name: gitops-output
+    - description: >
+        An optional workspace that contains the files that need to be added to
+        git. You can
+        
+        access the workspace from your script using `$(workspaces.input.path)`,
+        for instance:
+        
+          cp $(workspaces.input.path)/file_that_i_want .
+          git add file_that_i_want
+          # etc
+      name: input
+      optional: true
+    - description: |
+        A .ssh directory with private key, known_hosts, config, etc. Copied to
+        the user's home before git commands are executed. Used to authenticate
+        with the git remtoe when performing the clone. Binding a Secret to this
+        Workspace is strongly recommended over other volume types.
+      name: ssh-directory
+      optional: true
+    - description: |
+        A workspace containing a .gitconfig add .git-credentials file. These
+        will be copied to the user's home before any git commands are run. Any
+        other files in this Workspace are ignored. It is strongly recommended
+        to user ssh-directory over basic-auth whenever possible and to bind a
+        Secret to this Workspace over other volume types.
+      name: basic-auth
+      optional: true
+```
+
+## deploy-check Task
+
+```yaml
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy-check
+  namespace: tst1-pipeline
+spec:
+  params:
+    - description: name of the application to sync
+      name: application-name
+      type: string
+  steps:
+    - args:
+        - |-
+          echo "#######################################"
+          echo "# Check Application Deployment Status #"
+          echo "#######################################"
+          
+          while :
+          do
+          
+            # Set Variable
+            SYNC_STATUS=`oc get application --no-headers -n openshift-gitops "$(params.application-name)" | awk '{print $2}'`
+            HEALTH_STATUS=`oc get application --no-headers -n openshift-gitops "$(params.application-name)" | awk '{print $3}'`
+            CURRENT_TIME=$(date -u --date="9 hour" +%Y/%m/%d-%H:%M:%S)
+            
+            if [ $HEALTH_STATUS = "Healthy" ] && [ $SYNC_STATUS = "Synced" ]
+            then
+              echo "*** Application Deployment Complete. ***"
+              oc get application "$(params.application-name)" -n openshift-gitops
+              echo -n "Current Time : "
+              echo $CURRENT_TIME
+              echo ""
+              echo ""
+              break
+            else
+              echo "Application Deployment in progress..."
+              oc get application "$(params.application-name)" -n openshift-gitops
+              echo -n "Current Time : "
+              echo $CURRENT_TIME
+              echo ""
+              echo ""
+            fi
+          done
+      command:
+        - /bin/bash
+        - '-c'
+      image: 'hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-oc:4.12'
+      name: deploy-check
+      resources: {}
+      timeout: 5m0s
+```
+
+# Pipeline 구성 (v1.11.1)
+
+## 1-1. git-src-clone [ClusterTask]git-clone-1-11-0 Task 설정
+
+1. Red Hat OpenShift 웹 콘솔(hub) → Administrator → Pipelines → Pipelines → Project: tst1-pipeline → Create → Pipeline → Configure via: Pipeline builder, Name : tst1-pipeline, Tasks : Add task → + (Add task…) → git-clone-1-11-0 → Add [0.9]
+2. Display name : [git-src-clone]
+Parameters :
+url → [http://gitlab.hub1.local/root/tst1-src.git](http://gitlab.hub1.local/root/tst1-src.git)
+revision → main
+sslVerify → false
+gitInitImage → hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-git:latest
+(default : [registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:1a50511583fc02a27012d17d942e247813404104ddd282d7e26f99765174392c](http://registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:1a50511583fc02a27012d17d942e247813404104ddd282d7e26f99765174392c))
+3. Workspaces → + Add workspace → Name : tst1-src → [git-src-clone] 선택 → Worksapces → output : [tst1-src] 선택 → Create
+
+## 2. maven-build [ClusterTask]maven-1-11-0 Task 설정
+
+1. Red Hat OpenShift 웹 콘솔(hub) → Administrator → Pipelines → Pipelines → Project: tst1-pipeline → Create → Pipeline → Configure via: Pipeline builder, Name : tst1-pipeline, Tasks : Add task → + (Add task…) → maven-1-11-0 → Add [0.2]
+2. Display name : [maven-build]
+Parameters :
+MAVEN_IMAGE → hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-ubi8:latest
+(default :  [registry.redhat.io/ubi8/openjdk-17@sha256:923b18a62d892ec23b6bbf714ecb237a0a0fa3cd225fbf89d39966dd8d421c72](http://registry.redhat.io/ubi8/openjdk-17@sha256:923b18a62d892ec23b6bbf714ecb237a0a0fa3cd225fbf89d39966dd8d421c72))
+GOALS → package
+Workspaces:
+source → tst1-src
+maven-settings → + Add workspace → Name : maven-setting → [maven-build] 선택→ Workspaces → maven-settings → [maven-setting] 선택 → Create
+
+## 1-2. generate-tag Task 설정
+
+1. Red Hat OpenShift 웹 콘솔(hub) → Administrator → Pipelines → Pipelines → Project: tst1-pipeline → Create → Pipeline → Configure via: Pipeline builder, Name : tst1-pipeline, Tasks : Add task → + (Add task…) → generate-tag → Add
+
+## 3. buildah [ClusterTask]buildah-1-11-0 Task 설정
+
+1. Red Hat OpenShift 웹 콘솔(hub) → Administrator → Pipelines → Pipelines → Project: tst1-pipeline → Create → Pipeline → Configure via: Pipeline builder, Name : tst1-pipeline, Tasks : Add task → + (Add task…) → buildah-1-11-0 → Add [0.1]
+2. Display name : [buildah]
+Parameters :
+IMAGE → hub1-quay-registry.apps.hub1.local/demo-images/eap74-openjdk-17:$(tasks.generate-tag.results.image-tag)
+BUILDER_IMAGE → hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-buildah:latest
+(default : [registry.redhat.io/rhel8/buildah@sha256:00795fafdab9bbaa22cd29d1faa1a01e604e4884a2c935c1bf8e3d1f0ad1c084](http://registry.redhat.io/rhel8/buildah@sha256:00795fafdab9bbaa22cd29d1faa1a01e604e4884a2c935c1bf8e3d1f0ad1c084))
+TLSVERIFY → false
+Workspaces:
+source → tst1-src
+dockerconfig → + Add workspace → Name : tst1-quay-secret → [buildah] 선택→ Workspaces → dockerconfig → [tst1-pull-secret] 선택 → Create
+
+## 4. git-cfg-clone [ClusterTask]git-clone-1-11-0 Task 설정
+
+1. Red Hat OpenShift 웹 콘솔(hub) → Administrator → Pipelines → Pipelines → Project: tst1-pipeline → Create → Pipeline → Configure via: Pipeline builder, Name : tst1-pipeline, Tasks : Add task → + (Add task…) → git-clone-1-11-0 → Add [0.9]
+2. Display name : [git-src-clone]
+Parameters :
+url → [http://gitlab.hub1.local/root/tst1-cfg.git](http://gitlab.hub1.local/root/tst1-cfg.git)
+revision → main
+sslVerify → false
+gitInitImage → hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-git:latest
+(default : [registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:1a50511583fc02a27012d17d942e247813404104ddd282d7e26f99765174392c](http://registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:1a50511583fc02a27012d17d942e247813404104ddd282d7e26f99765174392c))
+3. Workspaces → + Add workspace → Name : tst1-cfg → [git-cfg-clone] 선택 → Worksapces → output : [tst1-cfg] 선택 → Create
+
+## 5. update-manifests Task 설정
+
+1. Red Hat OpenShift 웹 콘솔(hub) → Administrator → Pipelines → Pipelines → Project: tst1-pipeline → Create → Pipeline → Configure via: Pipeline builder, Name : tst1-pipeline, Tasks : Add task → + (Add task…) → update-manifests → Add
+2. Parameters :
+IMAGESTREAM → hub1-quay-registry.apps.hub1.local/demo-images/eap74-openjdk-17:$(tasks.generate-tag.results.image-tag)
+manifest_dir → . # branch 기준 디렉터리 경로(YAML의 위치)
+Workspaces
+tst1-cfg → [tst1-cfg] 선택 → Create
+
+## 6. update-repository Task 설정
+
+1. Red Hat OpenShift 웹 콘솔(hub) → Administrator → Pipelines → Pipelines → Project: tst1-pipeline → Create → Pipeline → Configure via: Pipeline builder, Name : tst1-pipeline, Tasks : Add task → + (Add task…) → update-repository → Add [0.4]
+2. Parameters :
+Workspaces
+gitops-output → tst1-cfg → Create
+
+## 7. deploy-check Task 설정
+
+1. Red Hat OpenShift 웹 콘솔(hub) → Administrator → Pipelines → Pipelines → Project: tst1-pipeline → Create → Pipeline → Configure via: Pipeline builder, Name : tst1-pipeline, Tasks : Add task → + (Add task…) → deploy-check → Add
+2. Parameters:
+application-name → tst1-demo
+
+# CI/CD용 container image 준비
+
+## 오프라인 환경 위한 컨테이너 이미지 다운로드
+
+1. 사용할 Task 지정
+2. CI(Tekton) 설치된 OCP 클러스터 pipelines의 기본 ClusterTasks(사용할 Task 중)의 목록 확인
+3. ClusterTasks 내 사용할 수 있는 base image 다운로드 경로 확인 → 다운로드
+4. 3번에서 확인 불가능한 이미지 → https://hub.tekton.dev (tekton hub) 접속 -> task 검색 -> YAML 이동 → base image 다운로드 경로 확인 → 다운로드
+5. 4번에서 확인 불가능한 이미지 → https://catalog.redhat.com/software (redhat 공식 registry) 접속 → 컨테이너 이미지 검색 → Get this image → Using Red Hat Login → Using podman login
+6. 5번에서 확인 불가능한 이미지 → [https://quay.io](https://quay.io/) 접속 확인
+
+```yaml
+podman pull registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:1a50511583fc02a27012d17d942e247813404104ddd282d7e26f99765174392c
+# git init 이미지 (ClusterTasks에서 확인)
+podman pull registry.redhat.io/ubi8/openjdk-17@sha256:923b18a62d892ec23b6bbf714ecb237a0a0fa3cd225fbf89d39966dd8d421c72
+# Red Hat Universal Base Image 8 Minimal 이미지 (ClusterTasks에서 확인)
+podman pull registry.redhat.io/rhel8/buildah@sha256:00795fafdab9bbaa22cd29d1faa1a01e604e4884a2c935c1bf8e3d1f0ad1c084
+# buildah 이미지 (ClusterTasks에서 확인)
+podman pull quay.io/openshift/origin-cli:4.12
+# openshift client 4.12 이미지 (tekton hub에서 확인)
+```
+
+## 이미지 태그 변경
+
+```yaml
+podman tag 9d3c50d8b197 hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-git:latest
+podman tag e651c620dbe6 hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-ubi8:latest
+podman tag cb8f6665f03b hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-buildah:latest
+podman tag 641d6d1d72af hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-oc:4.12
+# 태그 없이 받아진 이미지(다이제스트)는 IMAGE ID 또는 Tab,Tab으로 변경 -> 기존 태그는 사라짐(덮어쓰기)
+```
+
+## 이미지 로컬로 다운로드
+
+```yaml
+podman save -o tekton-task-git.tar hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-git:latest
+podman save -o tekton-task-ubi8.tar hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-ubi8:latest
+podman save -o tekton-task-buildah.tar hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-buildah:latest
+podman save -o tekton-task-oc.tar hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-oc:4.12
+```
+
+## 오프라인 환경 mirror registry로 파일 이동
+
+```bash
+scp -r cicd-images/ root@192.168.110.200:/data/
+```
+
+## mirror registry로 load 및 push
+
+```bash
+podman load -i tekton-task-git.tar
+podman load -i tekton-task-ubi8.tar
+podman load -i tekton-task-buildah.tar
+podman load -i tekton-task-oc.tar
+# load
+podman login -u quayadm -p quayadm123 hub1-quay-registry.apps.hub1.local --tls-verify=false
+# login
+podman push hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-git:latest --tls-verify=false
+podman push hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-ubi8:latest --tls-verify=false
+podman push hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-buildah:latest --tls-verify=false
+podman push hub1-quay-registry.apps.hub1.local/cicd-images/tekton-task-oc:4.12 --tls-verify=false
+# push
+# quay에 cicd-images organization 사전 생성
+```
